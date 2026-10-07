@@ -11,6 +11,6 @@ services:
     environment:
       - DISPLAY=:99
       # Extra request headers as a JSON object (same convention as bsp):
-      # - EXTRA_HTTP_HEADERS={"x-wdsoit-bot-bypass": "true"}
+      # - EXTRA_HTTP_HEADERS={"X-Bypass-Header": "<value>"}
     # Create output directory before running: mkdir -p output
     command: ["https://example.com", "-o", "/app/output", "--trim-file", "/app/trim_sections.txt"]
