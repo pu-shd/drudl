@@ -85,11 +85,11 @@ Sidebar
 
 ```bash
 # CLI
-export EXTRA_HTTP_HEADERS='{"x-wdsoit-bot-bypass": "true"}'
+export EXTRA_HTTP_HEADERS='{"X-Bypass-Header": "<value>"}'
 python drudl https://example.com -o output
 
 # Docker
-docker run -e 'EXTRA_HTTP_HEADERS={"x-wdsoit-bot-bypass": "true"}' -p 6080:6080 ...
+docker run -e 'EXTRA_HTTP_HEADERS={"X-Bypass-Header": "<value>"}' -p 6080:6080 ...
 ```
 
 For docker-compose, add the variable under `environment` in your `docker-compose.yml`.

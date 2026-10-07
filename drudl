@@ -35,7 +35,7 @@ def extra_http_headers():
     EXTRA_HTTP_HEADERS holds a JSON object of header name/value pairs, matching
     the convention used by the bsp tooling so one setting serves both:
 
-        EXTRA_HTTP_HEADERS={"x-wdsoit-bot-bypass": "true"}
+        EXTRA_HTTP_HEADERS={"X-Bypass-Header": "<value>"}
 
     DRUDL_BYPASS_HEADER remains supported for a single "Name: value" header.
     Only header names are printed - values may be secrets.
@@ -125,6 +125,11 @@ class DrupalDownloader:
                 'downloaded_urls': list(self.downloaded_urls),
                 'base_url': self.base_url
             }, f, indent=2)
+
+    @staticmethod
+    def is_bot_challenge(response):
+        """Check whether a response is a Cloudflare bot/managed challenge."""
+        return response.headers.get("cf-mitigated", "").lower() == "challenge"
 
     def detect_cas_auth(self, response):
         """Detect if response indicates CAS authentication is required."""
@@ -501,9 +506,14 @@ class DrupalDownloader:
             print(f"Failed to connect to the site: {e}")
             sys.exit(1)
 
-        if not response or not response.ok:
-            status = f" (HTTP {response.status_code})" if response else ""
+        # A Response is falsy for 4xx/5xx, so test against None explicitly
+        if response is None or not response.ok:
+            status = f" (HTTP {response.status_code})" if response is not None else ""
             print(f"Failed to connect to the site{status}.")
+            if response is not None and self.is_bot_challenge(response):
+                print("\nThe site is behind a Cloudflare bot challenge.")
+                print("Set your WAF bypass header in EXTRA_HTTP_HEADERS and retry:")
+                print("""  export EXTRA_HTTP_HEADERS='{"<header-name>": "<value>"}'""")
             sys.exit(1)
 
         print("✓ Connected successfully.\n")

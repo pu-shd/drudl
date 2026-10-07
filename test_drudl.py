@@ -34,8 +34,8 @@ class TestExtraHttpHeaders(unittest.TestCase):
         self.assertEqual(extra_http_headers(), {})
 
     def test_json_object(self):
-        os.environ["EXTRA_HTTP_HEADERS"] = '{"x-wdsoit-bot-bypass": "true"}'
-        self.assertEqual(extra_http_headers(), {"x-wdsoit-bot-bypass": "true"})
+        os.environ["EXTRA_HTTP_HEADERS"] = '{"x-bypass-header": "true"}'
+        self.assertEqual(extra_http_headers(), {"x-bypass-header": "true"})
 
     def test_multiple_headers(self):
         os.environ["EXTRA_HTTP_HEADERS"] = '{"a": "1", "b": "2"}'
@@ -75,9 +75,9 @@ class TestExtraHttpHeaders(unittest.TestCase):
         self.assertEqual(extra_http_headers(), {"a": "1", "b": "2"})
 
     def test_headers_reach_the_session(self):
-        os.environ["EXTRA_HTTP_HEADERS"] = '{"x-wdsoit-bot-bypass": "true"}'
+        os.environ["EXTRA_HTTP_HEADERS"] = '{"x-bypass-header": "true"}'
         downloader = DrupalDownloader("https://example.com", output_dir=tempfile.mkdtemp())
-        self.assertEqual(downloader.session.headers["x-wdsoit-bot-bypass"], "true")
+        self.assertEqual(downloader.session.headers["x-bypass-header"], "true")
 
     def test_values_are_not_printed(self):
         os.environ["EXTRA_HTTP_HEADERS"] = '{"x-secret": "super-secret-value"}'
@@ -298,6 +298,43 @@ class TestDrupalDownloader(unittest.TestCase):
         downloader = DrupalDownloader("https://example.com", output_dir=self.temp_dir)
         # Should have only the default headers
         self.assertIn("User-Agent", downloader.session.headers)
+
+
+class TestConnectionFailure(unittest.TestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.downloader = DrupalDownloader("https://example.com", output_dir=self.temp_dir)
+
+    def _run_with_response(self, response):
+        with patch.object(self.downloader.session, "get", return_value=response), \
+             patch.object(self.downloader, "detect_cas_auth", return_value=False), \
+             patch("builtins.print") as printed:
+            with self.assertRaises(SystemExit) as ctx:
+                self.downloader.run()
+        self.assertEqual(ctx.exception.code, 1)
+        return " ".join(str(call) for call in printed.call_args_list)
+
+    def _error_response(self, status, headers=None):
+        import requests
+        response = requests.Response()
+        response.status_code = status
+        response.headers.update(headers or {})
+        return response
+
+    def test_reports_status_code_on_http_error(self):
+        """A falsy 4xx Response must still have its status code reported."""
+        logged = self._run_with_response(self._error_response(500))
+        self.assertIn("HTTP 500", logged)
+        self.assertNotIn("Cloudflare", logged)
+
+    def test_cloudflare_challenge_suggests_bypass_header(self):
+        """A Cloudflare challenge 403 points the user at EXTRA_HTTP_HEADERS."""
+        logged = self._run_with_response(
+            self._error_response(403, {"cf-mitigated": "challenge"}))
+        self.assertIn("HTTP 403", logged)
+        self.assertIn("Cloudflare bot challenge", logged)
+        self.assertIn("EXTRA_HTTP_HEADERS", logged)
 
 
 if __name__ == "__main__":
