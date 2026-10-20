@@ -1,6 +1,6 @@
 # Test image: dependencies only, no browser or VNC stack needed.
 # The suite is fully mocked, so it never reaches a real site.
-FROM python:3.14-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 WORKDIR /app
 
